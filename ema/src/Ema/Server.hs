@@ -1,6 +1,7 @@
 module Ema.Server (
   EmaWebSocketOptions (..),
   runServerWithWebSocketHotReload,
+  runServerWithWebSocketHotReloadUnix,
 ) where
 
 import Control.Monad.Logger
@@ -67,3 +68,37 @@ warpRunSettings settings mPort banner app = do
     Just port -> do
       void $ banner port
       Warp.runSettings (settings & Warp.setPort port) app
+
+runServerWithWebSocketHotReloadUnix ::
+  forall r m.
+  ( Show r
+  , MonadIO m
+  , MonadUnliftIO m
+  , MonadLoggerIO m
+  , Eq r
+  , IsRoute r
+  , EmaStaticSite r
+  ) =>
+  Maybe (EmaWebSocketOptions r) ->
+  FilePath ->
+  LVar (RouteModel r) ->
+  m ()
+runServerWithWebSocketHotReloadUnix mWsOpts fp model = do
+  logger <- askLoggerIO
+  let settings =
+        Warp.defaultSettings
+      app =
+        case mWsOpts of
+          Nothing ->
+            httpApp @r logger model Nothing
+          Just opts ->
+            WaiWs.websocketsOr
+              WS.defaultConnectionOptions
+              (wsApp @r logger model $ emaWebSocketServerHandler opts)
+              (httpApp @r logger model $ Just $ emaWebSocketClientShim opts)
+      banner = do
+        logInfoNS "ema" "==============================================="
+        logInfoNS "ema" $ "Ema live server RUNNING: unix://" <> toText fp <> " (" <> maybe "no ws" (const "ws") mWsOpts <> ")"
+        logInfoNS "ema" "==============================================="
+  void banner
+  liftIO $ Warp.runSettingsUnix settings fp app
