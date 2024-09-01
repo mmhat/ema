@@ -21,6 +21,7 @@ import Ema.Route.Class (IsRoute (RouteModel))
 import Ema.Server qualified as Server
 import Ema.Site (EmaSite (SiteArg, siteInput), EmaStaticSite)
 import System.Directory (getCurrentDirectory)
+import System.Systemd.Daemon qualified as Systemd
 
 data SiteConfig r = SiteConfig
   { siteConfigCli :: CLI.Cli
@@ -85,7 +86,7 @@ runSiteWith cfg siteArg = do
       CLI.Generate dest -> do
         fs <- generateSiteFromModel @r dest model0
         pure (model0, (dest, fs))
-      CLI.Run (mhost, mport, CLI.unNoWebSocket -> noWebSocket) -> do
+      CLI.Run (CLI.unSystemdSocketActivation -> systemdSocketActivation, mhost, mport, CLI.unNoWebSocket -> noWebSocket) -> do
         model <- LVar.empty
         LVar.set model model0
         logger <- askLoggerIO
@@ -99,7 +100,13 @@ runSiteWith cfg siteArg = do
                 -- doesn't exit.
                 liftIO $ threadDelay maxBound
             )
-            ( flip runLoggingT logger $ do
+            ( flip runLoggingT logger $ if systemdSocketActivation
+              then do
+                socket <- lift Systemd.getActivatedSockets >>= \case
+                  Just (socket:_) -> pure socket
+                  _ -> CLI.crash "ema" "No file descriptor passed for systemd socket activation"
+                Server.runServerWithWebSocketHotReloadOnSocket @r mWsOpts socket model
+              else do
                 Server.runServerWithWebSocketHotReload @r mWsOpts mhost mport model
             )
         CLI.crash "ema" "Live server unexpectedly stopped"

@@ -96,6 +96,7 @@ library
     , optparse-applicative
     , relude                 >=1.0
     , sop-core
+    , systemd
     , text
     , unliftio
     , url-slug

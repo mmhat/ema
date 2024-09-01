@@ -26,8 +26,16 @@ data Action
     -- of generated files.
     Generate FilePath
   | -- | Run the live server
-    Run (Maybe Host, Maybe Port, NoWebSocket)
+    Run (SystemdSocketActivation, Maybe Host, Maybe Port, NoWebSocket)
   deriving stock (Eq, Show, Generic)
+
+-- | Whether to use systemd socket activation.
+newtype SystemdSocketActivation = SystemdSocketActivation {unSystemdSocketActivation :: Bool}
+  deriving newtype (Eq, Show)
+  deriving stock (Generic)
+
+instance Default SystemdSocketActivation where
+  def = SystemdSocketActivation False
 
 -- | Whether to disable websocket-based refresh and page loads.
 newtype NoWebSocket = NoWebSocket {unNoWebSocket :: Bool}
@@ -67,7 +75,7 @@ cliParser = do
   where
     run :: Parser Action
     run =
-      fmap Run $ (,,) <$> optional hostParser <*> optional portParser <*> noWebSocketParser
+      fmap Run $ (,,,) <$> systemdSocketActivationParser <*> optional hostParser <*> optional portParser <*> noWebSocketParser
     generate :: Parser Action
     generate =
       Generate <$> argument str (metavar "DEST")
@@ -79,6 +87,10 @@ hostParser =
 portParser :: Parser Port
 portParser =
   option auto (long "port" <> short 'p' <> metavar "PORT" <> help "Port to bind to")
+
+systemdSocketActivationParser :: Parser SystemdSocketActivation
+systemdSocketActivationParser =
+  SystemdSocketActivation <$> switch (long "systemd-socket-activation" <> help "Use systemd socket activation")
 
 noWebSocketParser :: Parser NoWebSocket
 noWebSocketParser =
