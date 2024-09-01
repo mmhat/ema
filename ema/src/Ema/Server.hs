@@ -32,13 +32,14 @@ runServerWithWebSocketHotReload ::
   , EmaStaticSite r
   ) =>
   Maybe (EmaWebSocketOptions r) ->
-  Host ->
+  Maybe Host ->
   Maybe Port ->
   LVar (RouteModel r) ->
   m ()
-runServerWithWebSocketHotReload mWsOpts host mport model = do
+runServerWithWebSocketHotReload mWsOpts mhost mport model = do
   logger <- askLoggerIO
   let runM = flip runLoggingT logger
+      host = fromMaybe "localhost" mhost
       settings =
         Warp.defaultSettings
           & Warp.setHost (fromString . toString . unHost $ host)

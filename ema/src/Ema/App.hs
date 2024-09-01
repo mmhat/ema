@@ -85,7 +85,7 @@ runSiteWith cfg siteArg = do
       CLI.Generate dest -> do
         fs <- generateSiteFromModel @r dest model0
         pure (model0, (dest, fs))
-      CLI.Run (host, mport, CLI.unNoWebSocket -> noWebSocket) -> do
+      CLI.Run (mhost, mport, CLI.unNoWebSocket -> noWebSocket) -> do
         model <- LVar.empty
         LVar.set model model0
         logger <- askLoggerIO
@@ -100,6 +100,6 @@ runSiteWith cfg siteArg = do
                 liftIO $ threadDelay maxBound
             )
             ( flip runLoggingT logger $ do
-                Server.runServerWithWebSocketHotReload @r mWsOpts host mport model
+                Server.runServerWithWebSocketHotReload @r mWsOpts mhost mport model
             )
         CLI.crash "ema" "Live server unexpectedly stopped"

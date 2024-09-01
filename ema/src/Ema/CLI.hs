@@ -26,7 +26,7 @@ data Action
     -- of generated files.
     Generate FilePath
   | -- | Run the live server
-    Run (Host, Maybe Port, NoWebSocket)
+    Run (Maybe Host, Maybe Port, NoWebSocket)
   deriving stock (Eq, Show, Generic)
 
 -- | Whether to disable websocket-based refresh and page loads.
@@ -67,7 +67,7 @@ cliParser = do
   where
     run :: Parser Action
     run =
-      fmap Run $ (,,) <$> hostParser <*> optional portParser <*> noWebSocketParser
+      fmap Run $ (,,) <$> optional hostParser <*> optional portParser <*> noWebSocketParser
     generate :: Parser Action
     generate =
       Generate <$> argument str (metavar "DEST")
