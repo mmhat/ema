@@ -1,7 +1,7 @@
 module Ema.Server (
   EmaWebSocketOptions (..),
   runServerWithWebSocketHotReload,
-  runServerWithWebSocketHotReloadUnix,
+  runServerWithWebSocketHotReloadOnSocket,
 ) where
 
 import Control.Monad.Logger
@@ -12,6 +12,7 @@ import Ema.Server.HTTP (httpApp)
 import Ema.Server.WebSocket (wsApp)
 import Ema.Server.WebSocket.Options (EmaWebSocketOptions (..))
 import Ema.Site (EmaStaticSite)
+import Network.Socket (Socket, getSocketName)
 import Network.Wai qualified as Wai
 import Network.Wai.Handler.Warp (Port)
 import Network.Wai.Handler.Warp qualified as Warp
@@ -69,7 +70,9 @@ warpRunSettings settings mPort banner app = do
       void $ banner port
       Warp.runSettings (settings & Warp.setPort port) app
 
-runServerWithWebSocketHotReloadUnix ::
+-- | A version of 'runServerWithWebSocketHotReload' that runs on a pre-allocated
+-- socket.
+runServerWithWebSocketHotReloadOnSocket ::
   forall r m.
   ( Show r
   , MonadIO m
@@ -80,13 +83,12 @@ runServerWithWebSocketHotReloadUnix ::
   , EmaStaticSite r
   ) =>
   Maybe (EmaWebSocketOptions r) ->
-  FilePath ->
+  Socket ->
   LVar (RouteModel r) ->
   m ()
-runServerWithWebSocketHotReloadUnix mWsOpts fp model = do
+runServerWithWebSocketHotReloadOnSocket mWsOpts socket model = do
   logger <- askLoggerIO
-  let settings =
-        Warp.defaultSettings
+  let settings = Warp.defaultSettings
       app =
         case mWsOpts of
           Nothing ->
@@ -97,8 +99,9 @@ runServerWithWebSocketHotReloadUnix mWsOpts fp model = do
               (wsApp @r logger model $ emaWebSocketServerHandler opts)
               (httpApp @r logger model $ Just $ emaWebSocketClientShim opts)
       banner = do
+        addr <- liftIO $ getSocketName socket
         logInfoNS "ema" "==============================================="
-        logInfoNS "ema" $ "Ema live server RUNNING: unix://" <> toText fp <> " (" <> maybe "no ws" (const "ws") mWsOpts <> ")"
+        logInfoNS "ema" $ "Ema live server RUNNING: Socket " <> show addr <> " (" <> maybe "no ws" (const "ws") mWsOpts <> ")"
         logInfoNS "ema" "==============================================="
   void banner
-  liftIO $ Warp.runSettingsUnix settings fp app
+  liftIO $ Warp.runSettingsSocket settings socket app

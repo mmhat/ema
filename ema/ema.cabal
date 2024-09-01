@@ -91,6 +91,7 @@ library
     , monad-logger-extras
     , mtl
     , neat-interpolation
+    , network
     , optics-core
     , optparse-applicative
     , relude                 >=1.0
